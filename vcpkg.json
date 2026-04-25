@@ -1,0 +1,10 @@
+{
+  "name": "cpppdf",
+  "version-string": "0.1.0",
+  "description": "C++ PDF processing library",
+  "dependencies": [
+    "zlib",
+    "libjpeg-turbo",
+    "libpng"
+  ]
+}
