@@ -15,7 +15,7 @@ add_subdirectory(wcppcli EXCLUDE_FROM_ALL)
 find_package(ZLIB REQUIRED)
 find_package(JPEG)
 
-add_library(cpppdf SHARED
+add_library(cpppdf STATIC
     src/cpppdf.cpp
     src/parser/lexer.cpp
     src/parser/object_parser.cpp
@@ -57,7 +57,7 @@ endif()
 add_executable(cpppdf_cli cli/main.cpp)
 target_link_libraries(cpppdf_cli PRIVATE cpppdf wcppcli)
 target_include_directories(cpppdf_cli PRIVATE src)
-set_target_properties(cpppdf_cli PROPERTIES OUTPUT_NAME cpppdf)
+set_target_properties(cpppdf_cli PROPERTIES OUTPUT_NAME wpdf)
 
 include(CTest)
 if(BUILD_TESTING)

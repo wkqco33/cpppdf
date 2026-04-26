@@ -1,0 +1,72 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            name: linux_amd64
+          - os: macos-latest
+            name: darwin_arm64
+          - os: macos-13
+            name: darwin_amd64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: 소스 체크아웃
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: 의존성 설치 (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build zlib1g-dev libjpeg-dev
+
+      - name: 의존성 설치 (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install ninja jpeg-turbo
+          echo "CMAKE_PREFIX_PATH=$(brew --prefix)" >> "$GITHUB_ENV"
+
+      - name: 빌드 (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          cmake -B build/release -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_STANDARD=17 \
+            -DBUILD_TESTING=OFF \
+            -DCMAKE_EXE_LINKER_FLAGS="-static-libgcc -static-libstdc++"
+          cmake --build build/release --target wpdf
+
+      - name: 빌드 (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          cmake -B build/release -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_STANDARD=17 \
+            -DBUILD_TESTING=OFF \
+            -DCMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH}"
+          cmake --build build/release --target wpdf
+
+      - name: 패키지 생성
+        run: |
+          cd build/release
+          tar czf ../../wpdf_${{ matrix.name }}.tar.gz wpdf
+
+      - name: GitHub Release에 업로드
+        uses: softprops/action-gh-release@v2
+        with:
+          files: wpdf_${{ matrix.name }}.tar.gz

@@ -1,0 +1,6 @@
+{
+  "description": "C++17 기반 PDF 파싱 및 변환 유틸리티 (텍스트 추출, Markdown 변환, 터미널 렌더링)",
+  "author": "wkqco33",
+  "homepage": "https://github.com/wkqco33/cpppdf",
+  "bin_name": "wpdf"
+}
