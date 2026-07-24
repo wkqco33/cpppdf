@@ -1,19 +1,54 @@
-#include "document.hpp"
-#include "../parser/lexer.hpp"
-#include "../parser/object_parser.hpp"
-#include "../parser/xref.hpp"
+#include "cpppdf/document.hpp"
+#include "parser/lexer.hpp"
+#include "parser/object_parser.hpp"
+#include "parser/xref.hpp"
 #include <array>
 #include <cstring>
 #include <fstream>
 #include <stdexcept>
 #include <utility>
 #include <vector>
+#include <unordered_map>
 
 namespace cpppdf {
 
+class PdfDocumentImpl {
+public:
+    bool load(const std::string& path);
+
+    int      page_count() const;
+    PageInfo page_info(int index) const;
+
+    PdfObject resolve(const PdfObject& obj) const;
+    PdfObject get_object(int32_t num, int32_t gen = 0) const;
+
+    PdfObject get_page_dict(int index) const;
+    std::vector<uint8_t> get_content(int index) const;
+    PdfDict get_resources(int index) const;
+
+    bool is_loaded() const { return !data_.empty(); }
+
+private:
+    std::vector<uint8_t>                          data_;
+    parser::XRefTable                             xref_;
+    PdfDict                                       trailer_;
+    mutable std::unordered_map<int32_t, PdfObject> obj_cache_;
+    std::vector<PdfObject>                        pages_;
+
+    void build_page_list(const PdfObject& node, PdfDict inherited_resources,
+                         std::array<float, 4> inherited_media_box);
+
+    PdfObject parse_object(int32_t num) const;
+    PdfObject parse_object_from_stream(int32_t object_stream_num,
+                                        int32_t target_num,
+                                        int32_t target_index) const;
+
+    void fill_stream_raw(PdfStream& stream, size_t stream_keyword_pos) const;
+};
+
 // ---- 파일 로드 ----
 
-bool PdfDocument::load(const std::string& path) {
+bool PdfDocumentImpl::load(const std::string& path) {
     std::ifstream f(path, std::ios::binary);
     if (!f) return false;
 
@@ -54,16 +89,14 @@ bool PdfDocument::load(const std::string& path) {
 
 // ---- 오브젝트 파싱 ----
 
-void PdfDocument::fill_stream_raw(PdfStream& stream, size_t stream_kw_pos) const {
+void PdfDocumentImpl::fill_stream_raw(PdfStream& stream, size_t stream_kw_pos) const {
     const uint8_t* buf = data_.data();
     size_t size = data_.size();
 
-    // "stream" 키워드 다음: LF 또는 CR LF
     size_t pos = stream_kw_pos;
     if (pos < size && buf[pos] == '\r') ++pos;
     if (pos < size && buf[pos] == '\n') ++pos;
 
-    // /Length 값 읽기
     auto lit = stream.dict.find("Length");
     if (lit == stream.dict.end()) return;
 
@@ -80,7 +113,7 @@ void PdfDocument::fill_stream_raw(PdfStream& stream, size_t stream_kw_pos) const
     stream.raw.assign(buf + pos, buf + pos + length);
 }
 
-PdfObject PdfDocument::parse_object(int32_t num) const {
+PdfObject PdfDocumentImpl::parse_object(int32_t num) const {
     auto it = xref_.find(num);
     if (it == xref_.end() || !it->second.in_use) return PdfObject::null_obj();
 
@@ -95,7 +128,6 @@ PdfObject PdfDocument::parse_object(int32_t num) const {
 
     parser::Lexer lex(data_.data(), data_.size(), offset);
 
-    // <num> <gen> obj
     parser::Token t1 = lex.next();
     parser::Token t2 = lex.next();
     parser::Token t3 = lex.next();
@@ -106,18 +138,16 @@ PdfObject PdfDocument::parse_object(int32_t num) const {
 
     PdfObject obj = parser::parse_value(lex);
 
-    // stream 인 경우 raw 데이터를 채움
     if (obj.is_stream() && obj.stream && obj.stream->raw.empty()) {
-        // parse_value → parse_dict_or_stream이 "stream" 키워드까지 소비함
         fill_stream_raw(*obj.stream, lex.pos());
     }
 
     return obj;
 }
 
-PdfObject PdfDocument::parse_object_from_stream(int32_t object_stream_num,
-                                                int32_t target_num,
-                                                int32_t target_index) const {
+PdfObject PdfDocumentImpl::parse_object_from_stream(int32_t object_stream_num,
+                                                    int32_t target_num,
+                                                    int32_t target_index) const {
     PdfObject object_stream = parse_object(object_stream_num);
     if (!object_stream.is_stream() || !object_stream.stream)
         return PdfObject::null_obj();
@@ -192,7 +222,7 @@ PdfObject PdfDocument::parse_object_from_stream(int32_t object_stream_num,
     return parser::parse_value(object_lex);
 }
 
-PdfObject PdfDocument::get_object(int32_t num, int32_t /*gen*/) const {
+PdfObject PdfDocumentImpl::get_object(int32_t num, int32_t /*gen*/) const {
     auto it = obj_cache_.find(num);
     if (it != obj_cache_.end()) return it->second;
 
@@ -201,34 +231,31 @@ PdfObject PdfDocument::get_object(int32_t num, int32_t /*gen*/) const {
     return obj;
 }
 
-PdfObject PdfDocument::resolve(const PdfObject& obj) const {
+PdfObject PdfDocumentImpl::resolve(const PdfObject& obj) const {
     if (!obj.is_ref()) return obj;
     return get_object(obj.ref_num, obj.ref_gen);
 }
 
 // ---- 페이지 트리 ----
 
-void PdfDocument::build_page_list(const PdfObject& node,
-                                   PdfDict inherited_resources,
-                                   std::array<float, 4> inherited_media_box) {
+void PdfDocumentImpl::build_page_list(const PdfObject& node,
+                                      PdfDict inherited_resources,
+                                      std::array<float, 4> inherited_media_box) {
     if (!node.is_dict()) return;
 
     const PdfDict& d = node.as_dict();
 
-    // /Type
     auto type_it = d.find("Type");
     if (type_it == d.end()) return;
     if (!type_it->second.is_name()) return;
     const std::string& type = type_it->second.s;
 
-    // 리소스 상속
     auto res_it = d.find("Resources");
     if (res_it != d.end()) {
         PdfObject res = resolve(res_it->second);
         if (res.is_dict()) inherited_resources = res.as_dict();
     }
 
-    // MediaBox 상속
     auto mb_it = d.find("MediaBox");
     if (mb_it != d.end()) {
         PdfObject mb = resolve(mb_it->second);
@@ -256,13 +283,11 @@ void PdfDocument::build_page_list(const PdfObject& node,
     }
 }
 
-// ---- 공개 인터페이스 ----
-
-int PdfDocument::page_count() const {
+int PdfDocumentImpl::page_count() const {
     return static_cast<int>(pages_.size());
 }
 
-PageInfo PdfDocument::page_info(int index) const {
+PageInfo PdfDocumentImpl::page_info(int index) const {
     PageInfo info;
     info.index = index;
 
@@ -283,13 +308,13 @@ PageInfo PdfDocument::page_info(int index) const {
     return info;
 }
 
-PdfObject PdfDocument::get_page_dict(int index) const {
+PdfObject PdfDocumentImpl::get_page_dict(int index) const {
     if (index < 0 || index >= static_cast<int>(pages_.size()))
         return PdfObject::null_obj();
     return pages_[static_cast<size_t>(index)];
 }
 
-std::vector<uint8_t> PdfDocument::get_content(int index) const {
+std::vector<uint8_t> PdfDocumentImpl::get_content(int index) const {
     PdfObject page = get_page_dict(index);
     if (!page.is_dict()) return {};
 
@@ -309,7 +334,6 @@ std::vector<uint8_t> PdfDocument::get_content(int index) const {
             result.insert(result.end(),
                           obj.stream->decoded.begin(),
                           obj.stream->decoded.end());
-            // 스트림 사이 공백 구분자
             result.push_back(' ');
         }
     };
@@ -324,7 +348,7 @@ std::vector<uint8_t> PdfDocument::get_content(int index) const {
     return result;
 }
 
-PdfDict PdfDocument::get_resources(int index) const {
+PdfDict PdfDocumentImpl::get_resources(int index) const {
     PdfObject page = get_page_dict(index);
     if (!page.is_dict()) return {};
 
@@ -336,5 +360,22 @@ PdfDict PdfDocument::get_resources(int index) const {
     if (!res.is_dict()) return {};
     return res.as_dict();
 }
+
+// ---- PdfDocument Pimpl 바인딩 ----
+
+PdfDocument::PdfDocument() : impl_(std::make_unique<PdfDocumentImpl>()) {}
+PdfDocument::~PdfDocument() = default;
+PdfDocument::PdfDocument(PdfDocument&&) noexcept = default;
+PdfDocument& PdfDocument::operator=(PdfDocument&&) noexcept = default;
+
+bool PdfDocument::load(const std::string& path) { return impl_->load(path); }
+int PdfDocument::page_count() const { return impl_->page_count(); }
+PageInfo PdfDocument::page_info(int index) const { return impl_->page_info(index); }
+PdfObject PdfDocument::resolve(const PdfObject& obj) const { return impl_->resolve(obj); }
+PdfObject PdfDocument::get_object(int32_t num, int32_t gen) const { return impl_->get_object(num, gen); }
+PdfObject PdfDocument::get_page_dict(int index) const { return impl_->get_page_dict(index); }
+std::vector<uint8_t> PdfDocument::get_content(int index) const { return impl_->get_content(index); }
+PdfDict PdfDocument::get_resources(int index) const { return impl_->get_resources(index); }
+bool PdfDocument::is_loaded() const { return impl_->is_loaded(); }
 
 } // namespace cpppdf

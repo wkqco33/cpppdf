@@ -290,17 +290,28 @@ void render_image(const ImageData& img, int max_cols, int max_rows) {
     };
 
     char esc[64];
+    int prev_tr = -1, prev_tg = -1, prev_tb = -1;
+    int prev_br = -1, prev_bg = -1, prev_bb = -1;
+
     for (int y = 0; y < out_h; y += 2) {
+        prev_tr = prev_tg = prev_tb = -1;
+        prev_br = prev_bg = prev_bb = -1;
         for (int x = 0; x < out_w; x++) {
             const uint8_t* top = pixel(x, y);
             const uint8_t* bot = pixel(x, y + 1);
 
-            // 전경(▀ 위쪽) = top 픽셀
-            snprintf(esc, sizeof(esc),
-                     "\033[38;2;%d;%d;%d;48;2;%d;%d;%dm",
-                     top[0], top[1], top[2],
-                     bot[0], bot[1], bot[2]);
-            buf += esc;
+            int tr = top[0], tg = top[1], tb = top[2];
+            int br = bot[0], bg = bot[1], bb = bot[2];
+
+            if (tr != prev_tr || tg != prev_tg || tb != prev_tb ||
+                br != prev_br || bg != prev_bg || bb != prev_bb) {
+                snprintf(esc, sizeof(esc),
+                         "\033[38;2;%d;%d;%d;48;2;%d;%d;%dm",
+                         tr, tg, tb, br, bg, bb);
+                buf += esc;
+                prev_tr = tr; prev_tg = tg; prev_tb = tb;
+                prev_br = br; prev_bg = bg; prev_bb = bb;
+            }
             buf += "\xe2\x96\x80"; // ▀
         }
         buf += "\033[0m\n";

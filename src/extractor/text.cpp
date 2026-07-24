@@ -11,18 +11,23 @@ namespace cpppdf::extractor {
 
 // ---- UTF-8 변환 ----
 
-static std::string to_utf8(uint32_t cp) {
-    if (cp == 0)       return {};
-    if (cp < 0x80)     return {static_cast<char>(cp)};
-    if (cp < 0x800)    return {static_cast<char>(0xC0 | (cp >> 6)),
-                               static_cast<char>(0x80 | (cp & 0x3F))};
-    if (cp < 0x10000)  return {static_cast<char>(0xE0 | (cp >> 12)),
-                               static_cast<char>(0x80 | ((cp >> 6) & 0x3F)),
-                               static_cast<char>(0x80 | (cp & 0x3F))};
-    return {static_cast<char>(0xF0 | (cp >> 18)),
-            static_cast<char>(0x80 | ((cp >> 12) & 0x3F)),
-            static_cast<char>(0x80 | ((cp >> 6) & 0x3F)),
-            static_cast<char>(0x80 | (cp & 0x3F))};
+static void append_utf8(std::string& out, uint32_t cp) {
+    if (cp == 0)       return;
+    if (cp < 0x80)     { out.push_back(static_cast<char>(cp)); }
+    else if (cp < 0x800) {
+        out.push_back(static_cast<char>(0xC0 | (cp >> 6)));
+        out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    }
+    else if (cp < 0x10000) {
+        out.push_back(static_cast<char>(0xE0 | (cp >> 12)));
+        out.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+        out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    } else {
+        out.push_back(static_cast<char>(0xF0 | (cp >> 18)));
+        out.push_back(static_cast<char>(0x80 | ((cp >> 12) & 0x3F)));
+        out.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+        out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    }
 }
 
 // ---- Windows-1252 to Unicode ----
@@ -56,7 +61,7 @@ static const uint32_t kWin1252[256] = {
 
 struct FontEncoding {
     std::array<uint32_t, 256>       table;  // 단일 바이트 → Unicode codepoint
-    std::map<std::string, std::string> cmap; // ToUnicode CMap (raw bytes → utf-8)
+    std::map<std::string, std::string, std::less<>> cmap; // ToUnicode CMap (raw bytes → utf-8)
     bool                            has_cmap = false;
     size_t                          min_code_bytes = 0;
     size_t                          max_code_bytes = 1;
@@ -99,22 +104,30 @@ static std::string utf16be_to_utf8(const std::string& bytes) {
         pos += 2;
 
         uint32_t cp = hi;
-        if (hi >= 0xD800 && hi <= 0xDBFF && pos + 1 < bytes.size()) {
-            uint16_t lo = (static_cast<uint8_t>(bytes[pos]) << 8) |
-                          static_cast<uint8_t>(bytes[pos + 1]);
-            if (lo >= 0xDC00 && lo <= 0xDFFF) {
-                cp = 0x10000u + (((static_cast<uint32_t>(hi) - 0xD800u) << 10)
-                                 | (static_cast<uint32_t>(lo) - 0xDC00u));
-                pos += 2;
+        if (hi >= 0xD800 && hi <= 0xDBFF) {
+            if (pos + 1 < bytes.size()) {
+                uint16_t lo = (static_cast<uint8_t>(bytes[pos]) << 8) |
+                              static_cast<uint8_t>(bytes[pos + 1]);
+                if (lo >= 0xDC00 && lo <= 0xDFFF) {
+                    cp = 0x10000u + (((static_cast<uint32_t>(hi) - 0xD800u) << 10)
+                                     | (static_cast<uint32_t>(lo) - 0xDC00u));
+                    pos += 2;
+                } else {
+                    cp = 0xFFFD; // 잘못된 low surrogate
+                }
+            } else {
+                cp = 0xFFFD; // low surrogate 누락
             }
+        } else if (hi >= 0xDC00 && hi <= 0xDFFF) {
+            cp = 0xFFFD; // 상위 surrogate 없는 하위 surrogate
         }
-        out += to_utf8(cp);
+        append_utf8(out, cp);
     }
 
     if (!out.empty()) return out;
 
     for (unsigned char c : bytes)
-        out += to_utf8(c);
+        append_utf8(out, c);
     return out;
 }
 
@@ -265,25 +278,25 @@ struct TextState {
 static std::string decode_bytes(const std::string& raw, const FontEncoding& enc) {
     std::string out;
     out.reserve(raw.size());
+    std::string_view raw_view(raw);
     for (size_t pos = 0; pos < raw.size();) {
         if (enc.has_cmap) {
             size_t min_len = enc.min_code_bytes > 0 ? enc.min_code_bytes : 1;
             size_t max_len = std::min(enc.max_code_bytes, raw.size() - pos);
             for (size_t len = max_len; len >= min_len; --len) {
-                auto it = enc.cmap.find(raw.substr(pos, len));
+                auto it = enc.cmap.find(raw_view.substr(pos, len));
                 if (it != enc.cmap.end()) {
                     out += it->second;
                     pos += len;
                     goto next_code;
                 }
-                if (len == min_len) break;
             }
         }
 
         {
             unsigned char c = static_cast<unsigned char>(raw[pos]);
             uint32_t cp = enc.table[c];
-            if (cp) out += to_utf8(cp);
+            if (cp) append_utf8(out, cp);
             pos++;
         }
 

@@ -1,22 +1,22 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(cpppdf LANGUAGES CXX)
-
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg.json" AND NOT CMAKE_TOOLCHAIN_FILE)
-  message(WARNING "vcpkg.json detected but CMAKE_TOOLCHAIN_FILE is not set. Packages might not be found.")
-endif()
+project(cpppdf VERSION 1.0.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-add_subdirectory(wcppcli EXCLUDE_FROM_ALL)
+# 옵션 설정
+option(CPPPDF_BUILD_EXAMPLES "Build cpppdf usage examples" ON)
+option(BUILD_TESTING "Build unit tests" ON)
 
+# 외부 필수/선택 패키지
 find_package(ZLIB REQUIRED)
 find_package(JPEG)
 
 add_library(cpppdf STATIC
     src/cpppdf.cpp
+    src/error.cpp
     src/parser/lexer.cpp
     src/parser/object_parser.cpp
     src/parser/xref.cpp
@@ -32,9 +32,15 @@ add_library(cpppdf STATIC
     src/renderer/terminal.cpp
 )
 
+# Alias 설정 (FetchContent 지원)
+add_library(cpppdf::cpppdf ALIAS cpppdf)
+
 target_include_directories(cpppdf
-    PUBLIC  include
-    PRIVATE src
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
 target_link_libraries(cpppdf PRIVATE ZLIB::ZLIB)
@@ -46,7 +52,6 @@ if(JPEG_FOUND)
 else()
     message(STATUS "JPEG support disabled (libjpeg not found)")
 endif()
-target_compile_features(cpppdf PUBLIC cxx_std_17)
 
 if(MSVC)
     target_compile_options(cpppdf PRIVATE /W4 /permissive-)
@@ -54,12 +59,52 @@ else()
     target_compile_options(cpppdf PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
-add_executable(cpppdf_cli cli/main.cpp)
-target_link_libraries(cpppdf_cli PRIVATE cpppdf wcppcli)
-target_include_directories(cpppdf_cli PRIVATE src)
-set_target_properties(cpppdf_cli PROPERTIES OUTPUT_NAME wpdf)
+# 서브디렉터리
+if(CPPPDF_BUILD_EXAMPLES)
+    add_subdirectory(examples)
+endif()
 
 include(CTest)
 if(BUILD_TESTING)
     add_subdirectory(tests)
 endif()
+
+# Installation & Package Export 규칙
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
+install(TARGETS cpppdf
+    EXPORT cpppdfTargets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+install(DIRECTORY include/cpppdf
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+install(EXPORT cpppdfTargets
+    FILE cpppdfTargets.cmake
+    NAMESPACE cpppdf::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/cpppdf
+)
+
+configure_package_config_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/cpppdfConfig.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/cpppdfConfig.cmake"
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/cpppdf
+)
+
+write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/cpppdfConfigVersion.cmake"
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion
+)
+
+install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/cpppdfConfig.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/cpppdfConfigVersion.cmake"
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/cpppdf
+)

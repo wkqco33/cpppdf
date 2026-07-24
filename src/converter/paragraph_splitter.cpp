@@ -1,20 +1,65 @@
 #include "paragraph_splitter.hpp"
 #include <algorithm>
+#include <cctype>
 #include <cmath>
-#include <regex>
+#include <string_view>
 
 namespace cpppdf::converter {
 
 namespace {
 
-static std::string strip_marker(const std::string& text, const std::regex& pattern) {
-    return std::regex_replace(text, pattern, std::string(), std::regex_constants::format_first_only);
+static bool starts_with(std::string_view sv, std::string_view prefix) {
+    return sv.size() >= prefix.size() && sv.substr(0, prefix.size()) == prefix;
+}
+
+// Bullet 마커: ^\s*[-*•·]\s+
+static bool parse_bullet_marker(std::string_view text, size_t& content_pos) {
+    size_t i = 0;
+    while (i < text.size() && (text[i] == ' ' || text[i] == '\t')) ++i;
+    if (i >= text.size()) return false;
+
+    std::string_view sub = text.substr(i);
+    size_t char_len = 0;
+    if (starts_with(sub, "-") || starts_with(sub, "*")) {
+        char_len = 1;
+    } else if (starts_with(sub, "\xE2\x80\xA2")) { // •
+        char_len = 3;
+    } else if (starts_with(sub, "\xC2\xB7")) {     // ·
+        char_len = 2;
+    } else {
+        return false;
+    }
+    i += char_len;
+
+    if (i < text.size() && (text[i] == ' ' || text[i] == '\t')) {
+        while (i < text.size() && (text[i] == ' ' || text[i] == '\t')) ++i;
+        content_pos = i;
+        return true;
+    }
+    return false;
+}
+
+// Ordered 마커: ^\s*\d+[.)]\s+
+static bool parse_ordered_marker(std::string_view text, size_t& content_pos) {
+    size_t i = 0;
+    while (i < text.size() && (text[i] == ' ' || text[i] == '\t')) ++i;
+    if (i >= text.size() || !std::isdigit(static_cast<unsigned char>(text[i]))) return false;
+
+    while (i < text.size() && std::isdigit(static_cast<unsigned char>(text[i]))) ++i;
+    if (i >= text.size()) return false;
+
+    if (text[i] != '.' && text[i] != ')') return false;
+    ++i;
+
+    if (i < text.size() && (text[i] == ' ' || text[i] == '\t')) {
+        while (i < text.size() && (text[i] == ' ' || text[i] == '\t')) ++i;
+        content_pos = i;
+        return true;
+    }
+    return false;
 }
 
 static Paragraph build_body_or_list(const std::vector<Line>& chunk) {
-    static const std::regex kBulletPattern(R"(^\s*[-*•·]\s+)");
-    static const std::regex kOrderedPattern(R"(^\s*\d+[.)]\s+)");
-
     Paragraph paragraph;
     paragraph.kind         = ParagraphKind::Body;
     paragraph.role         = BlockRole::Body;
@@ -23,8 +68,9 @@ static Paragraph build_body_or_list(const std::vector<Line>& chunk) {
 
     if (chunk.empty()) return paragraph;
 
-    const bool bullet_first  = std::regex_search(chunk.front().text, kBulletPattern);
-    const bool ordered_first = std::regex_search(chunk.front().text, kOrderedPattern);
+    size_t dummy_pos = 0;
+    const bool bullet_first  = parse_bullet_marker(chunk.front().text, dummy_pos);
+    const bool ordered_first = parse_ordered_marker(chunk.front().text, dummy_pos);
 
     if (!bullet_first && !ordered_first)
         return paragraph;
@@ -33,10 +79,12 @@ static Paragraph build_body_or_list(const std::vector<Line>& chunk) {
                                   : ParagraphKind::OrderedList;
     paragraph.items.clear();
 
-    const std::regex& pattern = bullet_first ? kBulletPattern : kOrderedPattern;
     for (const auto& line : chunk) {
-        if (std::regex_search(line.text, pattern)) {
-            paragraph.items.push_back(strip_marker(line.text, pattern));
+        size_t content_pos = 0;
+        bool match = bullet_first ? parse_bullet_marker(line.text, content_pos)
+                                  : parse_ordered_marker(line.text, content_pos);
+        if (match) {
+            paragraph.items.push_back(line.text.substr(content_pos));
             continue;
         }
 

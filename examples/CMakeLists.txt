@@ -1,0 +1,14 @@
+add_executable(example_01_info 01_info.cpp)
+target_link_libraries(example_01_info PRIVATE cpppdf)
+
+add_executable(example_02_extract_text 02_extract_text.cpp)
+target_link_libraries(example_02_extract_text PRIVATE cpppdf)
+
+add_executable(example_03_extract_images 03_extract_images.cpp)
+target_link_libraries(example_03_extract_images PRIVATE cpppdf)
+
+add_executable(example_04_render_terminal 04_render_terminal.cpp)
+target_link_libraries(example_04_render_terminal PRIVATE cpppdf)
+
+add_executable(example_05_pdf2md 05_pdf2md.cpp)
+target_link_libraries(example_05_pdf2md PRIVATE cpppdf)

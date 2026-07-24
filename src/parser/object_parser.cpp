@@ -88,7 +88,9 @@ PdfDict parse_dict(Lexer& lex) {
 
 bool flate_decode(const std::vector<uint8_t>& src, std::vector<uint8_t>& dst) {
     dst.clear();
-    uLongf out_size = static_cast<uLongf>(src.size()) * 4;
+    if (src.empty()) return true;
+
+    uLongf out_size = std::max<size_t>(1024, src.size() * 4);
     dst.resize(out_size);
 
     int ret;
@@ -98,6 +100,8 @@ bool flate_decode(const std::vector<uint8_t>& src, std::vector<uint8_t>& dst) {
 
     if (inflateInit(&zs) != Z_OK) return false;
 
+    constexpr size_t kMaxDecodeLimit = 128 * 1024 * 1024; // 128MB 안전 제한
+
     while (true) {
         zs.next_out  = dst.data() + zs.total_out;
         zs.avail_out = static_cast<uInt>(dst.size() - zs.total_out);
@@ -105,7 +109,10 @@ bool flate_decode(const std::vector<uint8_t>& src, std::vector<uint8_t>& dst) {
         ret = inflate(&zs, Z_NO_FLUSH);
         if (ret == Z_STREAM_END) break;
         if (ret == Z_BUF_ERROR || zs.avail_out == 0) {
-            // 버퍼 부족: 2배 확장
+            if (dst.size() >= kMaxDecodeLimit) {
+                inflateEnd(&zs);
+                return false;
+            }
             dst.resize(dst.size() * 2);
         } else if (ret != Z_OK) {
             inflateEnd(&zs);

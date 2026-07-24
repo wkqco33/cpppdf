@@ -2,28 +2,29 @@
 #include <algorithm>
 #include <cmath>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace cpppdf::converter {
 
 namespace {
 
-static std::string trim_copy(const std::string& text) {
+static std::string_view trim_sv(std::string_view sv) {
     size_t first = 0;
-    while (first < text.size() &&
-           (text[first] == ' ' || text[first] == '\t' ||
-            text[first] == '\n' || text[first] == '\r')) {
+    while (first < sv.size() &&
+           (sv[first] == ' ' || sv[first] == '\t' ||
+            sv[first] == '\n' || sv[first] == '\r')) {
         ++first;
     }
 
-    size_t last = text.size();
+    size_t last = sv.size();
     while (last > first &&
-           (text[last - 1] == ' ' || text[last - 1] == '\t' ||
-            text[last - 1] == '\n' || text[last - 1] == '\r')) {
+           (sv[last - 1] == ' ' || sv[last - 1] == '\t' ||
+            sv[last - 1] == '\n' || sv[last - 1] == '\r')) {
         --last;
     }
 
-    return text.substr(first, last - first);
+    return sv.substr(first, last - first);
 }
 
 static float median(std::vector<float> values, float fallback) {
@@ -116,9 +117,11 @@ NormalizationResult normalize_blocks(const std::vector<TextBlock>& blocks) {
     xs.reserve(blocks.size());
 
     for (const auto& block : blocks) {
+        std::string_view trimmed = trim_sv(block.text);
+        if (trimmed.empty()) continue;
+
         TextBlock cleaned = block;
-        cleaned.text = trim_copy(cleaned.text);
-        if (cleaned.text.empty()) continue;
+        cleaned.text = std::string(trimmed);
 
         filtered.push_back(cleaned);
         font_sizes.push_back(cleaned.font_size > 0.0f ? cleaned.font_size : 12.0f);
@@ -128,9 +131,10 @@ NormalizationResult normalize_blocks(const std::vector<TextBlock>& blocks) {
     if (filtered.empty()) return result;
 
     result.stats.median_font_size =
-        median(font_sizes, 12.0f);
+        median(std::move(font_sizes), 12.0f);
+    float median_x_val = median(xs, 0.0f);
     result.stats.median_x =
-        estimate_body_x(xs, median(xs, 0.0f));
+        estimate_body_x(std::move(xs), median_x_val);
     result.stats.median_line_height =
         std::max(result.stats.median_font_size * 1.1f,
                  estimate_line_height(filtered, result.stats.median_font_size * 1.2f));
