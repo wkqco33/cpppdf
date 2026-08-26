@@ -1,21 +1,27 @@
 #include "cpppdf/cpppdf.hpp"
-#include "extractor/text.hpp"
-#include "extractor/image.hpp"
 #include "document/document.hpp"
+#include "extractor/image.hpp"
+#include "extractor/text.hpp"
 #include <cassert>
 #include <cstdio>
 
 static int g_pass = 0, g_fail = 0;
 
-#define CHECK(cond) do { \
-    if (cond) { ++g_pass; } \
-    else { ++g_fail; fprintf(stderr, "FAIL: %s (%s:%d)\n", #cond, __FILE__, __LINE__); } \
-} while(0)
+#define CHECK(cond)                                                                                \
+    do {                                                                                           \
+        if (cond) {                                                                                \
+            ++g_pass;                                                                              \
+        } else {                                                                                   \
+            ++g_fail;                                                                              \
+            fprintf(stderr, "FAIL: %s (%s:%d)\n", #cond, __FILE__, __LINE__);                      \
+        }                                                                                          \
+    } while (0)
 
 static void test_extract_text_sample() {
     cpppdf::PdfDocument doc;
     if (!doc.load("tests/fixtures/sample.pdf")) {
-        fprintf(stderr, "SKIP: cannot load sample.pdf\n");
+        fprintf(stderr, "FAIL: cannot load sample.pdf\n");
+        ++g_fail;
         return;
     }
 
@@ -23,20 +29,24 @@ static void test_extract_text_sample() {
     CHECK(!blocks.empty());
 
     bool found = false;
-    for (const auto& b : blocks) {
+    for (const auto &b : blocks) {
         if (b.text.find("Hello") != std::string::npos ||
             b.text.find("cpppdf") != std::string::npos) {
             found = true;
         }
-        fprintf(stdout, "  text=%-30s  pos=(%.1f, %.1f)  size=%.1f\n",
-                b.text.c_str(), b.x, b.y, b.font_size);
+        fprintf(stdout, "  text=%-30s  pos=(%.1f, %.1f)  size=%.1f\n", b.text.c_str(), b.x, b.y,
+                b.font_size);
     }
     CHECK(found);
 }
 
 static void test_public_api() {
-    cpppdf::PdfDocument* doc = cpppdf::open("tests/fixtures/sample.pdf");
-    if (!doc) { fprintf(stderr, "SKIP: cannot open sample.pdf\n"); return; }
+    cpppdf::PdfDocument *doc = cpppdf::open("tests/fixtures/sample.pdf");
+    if (!doc) {
+        fprintf(stderr, "FAIL: cannot open sample.pdf\n");
+        ++g_fail;
+        return;
+    }
 
     auto blocks = cpppdf::extract_text(doc, 0);
     CHECK(!blocks.empty());
@@ -48,7 +58,8 @@ static void test_public_api() {
 static void test_extract_images() {
     cpppdf::PdfDocument doc;
     if (!doc.load("tests/fixtures/image_test.pdf")) {
-        fprintf(stderr, "SKIP: cannot load image_test.pdf\n");
+        fprintf(stderr, "FAIL: cannot load image_test.pdf\n");
+        ++g_fail;
         return;
     }
 
@@ -57,9 +68,8 @@ static void test_extract_images() {
 
     // Image 1: 4x4 RGB FlateDecode
     bool found_4x4 = false, found_8x8 = false;
-    for (const auto& img : images) {
-        fprintf(stdout, "  image: %dx%d  pixels=%zu\n",
-                img.width, img.height, img.pixels.size());
+    for (const auto &img : images) {
+        fprintf(stdout, "  image: %dx%d  pixels=%zu\n", img.width, img.height, img.pixels.size());
 
         if (img.width == 4 && img.height == 4) {
             found_4x4 = true;
@@ -70,7 +80,7 @@ static void test_extract_images() {
             CHECK(img.pixels[2] == 128);
             CHECK(img.pixels[3] == 255);
             // 우하단 픽셀 (3,3): R=255, G=255, B=128
-            size_t last = (4*3 + 3) * 4;
+            size_t last = (4 * 3 + 3) * 4;
             CHECK(img.pixels[last + 0] == 255);
             CHECK(img.pixels[last + 1] == 255);
             CHECK(img.pixels[last + 2] == 128);
@@ -90,8 +100,12 @@ static void test_extract_images() {
 }
 
 static void test_extract_images_api() {
-    cpppdf::PdfDocument* doc = cpppdf::open("tests/fixtures/image_test.pdf");
-    if (!doc) { fprintf(stderr, "SKIP: cannot open image_test.pdf\n"); return; }
+    cpppdf::PdfDocument *doc = cpppdf::open("tests/fixtures/image_test.pdf");
+    if (!doc) {
+        fprintf(stderr, "FAIL: cannot open image_test.pdf\n");
+        ++g_fail;
+        return;
+    }
 
     auto images = cpppdf::extract_images(doc, 0);
     CHECK(images.size() == 2);

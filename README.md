@@ -112,4 +112,26 @@ int main() {
 
 ## 라이선스
 
-저장소 정책에 따릅니다.
+이 프로젝트는 [MIT License](LICENSE)로 배포됩니다.
+
+## 개발
+
+개발 절차와 테스트 규칙은 [AGENTS.md](AGENTS.md)를, 변경 제안 방법은
+[CONTRIBUTING.md](CONTRIBUTING.md)를 참고하세요.
+
+```bash
+cmake --preset debug-native
+cmake --build build/debug
+ctest --test-dir build/debug --output-on-failure
+```
+
+`debug`와 `release` preset은 `VCPKG_ROOT`가 설정된 경우 vcpkg를 사용합니다.
+vcpkg 없이 시스템의 ZLIB/libjpeg를 사용하려면 `debug-native` 또는
+`release-native`를 사용하세요. JPEG는 선택 기능입니다.
+
+PDF 파서는 외부 입력을 처리하므로 신뢰할 수 없는 파일은 애플리케이션 수준에서
+리소스 제한과 격리를 적용해야 합니다. 보안 취약점은 [SECURITY.md](SECURITY.md)의
+절차를 따라 비공개로 제보해 주세요.
+
+성능 측정과 향후 최적화 후보는 [docs/PERFORMANCE.md](docs/PERFORMANCE.md)에 정리되어
+있습니다.

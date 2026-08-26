@@ -5,6 +5,6 @@
 
 namespace cpppdf::converter {
 
-std::string render_markdown(const std::vector<Paragraph>& paragraphs);
+std::string render_markdown(const std::vector<Paragraph> &paragraphs);
 
 } // namespace cpppdf::converter

@@ -10,16 +10,21 @@
 
 static int g_pass = 0, g_fail = 0;
 
-#define CHECK(cond) do { \
-    if (cond) { ++g_pass; } \
-    else { ++g_fail; fprintf(stderr, "FAIL: %s (%s:%d)\n", #cond, __FILE__, __LINE__); } \
-} while(0)
+#define CHECK(cond)                                                                                \
+    do {                                                                                           \
+        if (cond) {                                                                                \
+            ++g_pass;                                                                              \
+        } else {                                                                                   \
+            ++g_fail;                                                                              \
+            fprintf(stderr, "FAIL: %s (%s:%d)\n", #cond, __FILE__, __LINE__);                      \
+        }                                                                                          \
+    } while (0)
 
 // ---- Lexer 테스트 ----
 
 static void test_lexer_numbers() {
-    const char* src = "123 -4 3.14 .5 1.";
-    auto data = reinterpret_cast<const uint8_t*>(src);
+    const char *src = "123 -4 3.14 .5 1.";
+    auto data = reinterpret_cast<const uint8_t *>(src);
     cpppdf::parser::Lexer lex(data, strlen(src));
 
     auto t = lex.next();
@@ -43,22 +48,22 @@ static void test_lexer_numbers() {
 
 static void test_lexer_strings() {
     {
-        const char* src = "(hello world)";
-        cpppdf::parser::Lexer lex(reinterpret_cast<const uint8_t*>(src), strlen(src));
+        const char *src = "(hello world)";
+        cpppdf::parser::Lexer lex(reinterpret_cast<const uint8_t *>(src), strlen(src));
         auto t = lex.next();
         CHECK(t.type == cpppdf::parser::TokType::StrLit);
         CHECK(t.sv == "hello world");
     }
     {
-        const char* src = "(it\\(s)";
-        cpppdf::parser::Lexer lex(reinterpret_cast<const uint8_t*>(src), strlen(src));
+        const char *src = "(it\\(s)";
+        cpppdf::parser::Lexer lex(reinterpret_cast<const uint8_t *>(src), strlen(src));
         auto t = lex.next();
         CHECK(t.type == cpppdf::parser::TokType::StrLit);
         CHECK(t.sv == "it(s");
     }
     {
-        const char* src = "<4865 6c6c 6f>";
-        cpppdf::parser::Lexer lex(reinterpret_cast<const uint8_t*>(src), strlen(src));
+        const char *src = "<4865 6c6c 6f>";
+        cpppdf::parser::Lexer lex(reinterpret_cast<const uint8_t *>(src), strlen(src));
         auto t = lex.next();
         CHECK(t.type == cpppdf::parser::TokType::StrHex);
         CHECK(t.sv == "Hello");
@@ -66,8 +71,8 @@ static void test_lexer_strings() {
 }
 
 static void test_lexer_names() {
-    const char* src = "/Type /F#2Foo";
-    cpppdf::parser::Lexer lex(reinterpret_cast<const uint8_t*>(src), strlen(src));
+    const char *src = "/Type /F#2Foo";
+    cpppdf::parser::Lexer lex(reinterpret_cast<const uint8_t *>(src), strlen(src));
 
     auto t = lex.next();
     CHECK(t.type == cpppdf::parser::TokType::Name && t.sv == "Type");
@@ -78,8 +83,8 @@ static void test_lexer_names() {
 }
 
 static void test_lexer_keywords() {
-    const char* src = "true false null obj endobj R stream endstream";
-    cpppdf::parser::Lexer lex(reinterpret_cast<const uint8_t*>(src), strlen(src));
+    const char *src = "true false null obj endobj R stream endstream";
+    cpppdf::parser::Lexer lex(reinterpret_cast<const uint8_t *>(src), strlen(src));
 
     auto t = lex.next();
     CHECK(t.type == cpppdf::parser::TokType::Bool && t.bv == true);
@@ -101,8 +106,8 @@ static void test_lexer_keywords() {
 }
 
 static void test_lexer_dict() {
-    const char* src = "<< /Type /Page >>";
-    cpppdf::parser::Lexer lex(reinterpret_cast<const uint8_t*>(src), strlen(src));
+    const char *src = "<< /Type /Page >>";
+    cpppdf::parser::Lexer lex(reinterpret_cast<const uint8_t *>(src), strlen(src));
 
     auto t = lex.next();
     CHECK(t.type == cpppdf::parser::TokType::DictBegin);
@@ -120,8 +125,8 @@ static void test_lexer_dict() {
 // ---- ObjectParser 테스트 ----
 
 static void test_parse_dict() {
-    const char* src = "<< /Type /Catalog /Version /1.7 >>";
-    cpppdf::parser::Lexer lex(reinterpret_cast<const uint8_t*>(src), strlen(src));
+    const char *src = "<< /Type /Catalog /Version /1.7 >>";
+    cpppdf::parser::Lexer lex(reinterpret_cast<const uint8_t *>(src), strlen(src));
 
     auto t = lex.next(); // <<
     CHECK(t.type == cpppdf::parser::TokType::DictBegin);
@@ -133,8 +138,8 @@ static void test_parse_dict() {
 }
 
 static void test_parse_indirect_ref() {
-    const char* src = "1 0 R";
-    cpppdf::parser::Lexer lex(reinterpret_cast<const uint8_t*>(src), strlen(src));
+    const char *src = "1 0 R";
+    cpppdf::parser::Lexer lex(reinterpret_cast<const uint8_t *>(src), strlen(src));
 
     cpppdf::PdfObject obj = cpppdf::parser::parse_value(lex);
     CHECK(obj.is_ref());
@@ -142,8 +147,8 @@ static void test_parse_indirect_ref() {
 }
 
 static void test_parse_array() {
-    const char* src = "[1 2.5 /Name (hello) true null]";
-    cpppdf::parser::Lexer lex(reinterpret_cast<const uint8_t*>(src), strlen(src));
+    const char *src = "[1 2.5 /Name (hello) true null]";
+    cpppdf::parser::Lexer lex(reinterpret_cast<const uint8_t *>(src), strlen(src));
 
     cpppdf::PdfObject obj = cpppdf::parser::parse_value(lex);
     CHECK(obj.is_array());
@@ -159,29 +164,28 @@ static void test_parse_array() {
 // ---- find_startxref 테스트 ----
 
 static void test_find_startxref() {
-    const char* src =
-        "%PDF-1.4\n"
-        "1 0 obj\n<</Type /Catalog>>\nendobj\n"
-        "xref\n0 2\n"
-        "0000000000 65535 f\r\n"
-        "0000000009 00000 n\r\n"
-        "trailer\n<</Size 2 /Root 1 0 R>>\n"
-        "startxref\n"
-        "42\n"
-        "%%EOF\n";
+    const char *src = "%PDF-1.4\n"
+                      "1 0 obj\n<</Type /Catalog>>\nendobj\n"
+                      "xref\n0 2\n"
+                      "0000000000 65535 f\r\n"
+                      "0000000009 00000 n\r\n"
+                      "trailer\n<</Size 2 /Root 1 0 R>>\n"
+                      "startxref\n"
+                      "42\n"
+                      "%%EOF\n";
 
     size_t sz = strlen(src);
-    size_t off = cpppdf::parser::find_startxref(
-        reinterpret_cast<const uint8_t*>(src), sz);
+    size_t off = cpppdf::parser::find_startxref(reinterpret_cast<const uint8_t *>(src), sz);
     CHECK(off == 42);
 }
 
 // ---- 실제 PDF 파일 테스트 (있으면) ----
 
-static void test_open_pdf(const char* path) {
-    cpppdf::PdfDocument* doc = cpppdf::open(path);
+static void test_open_pdf(const char *path) {
+    cpppdf::PdfDocument *doc = cpppdf::open(path);
     if (!doc) {
-        fprintf(stderr, "SKIP: cannot open %s\n", path);
+        fprintf(stderr, "FAIL: cannot open %s\n", path);
+        ++g_fail;
         return;
     }
 
@@ -197,9 +201,10 @@ static void test_open_pdf(const char* path) {
 }
 
 static void test_open_object_stream_pdf() {
-    cpppdf::PdfDocument* doc = cpppdf::open("tests/fixtures/object_stream.pdf");
+    cpppdf::PdfDocument *doc = cpppdf::open("tests/fixtures/object_stream.pdf");
     if (!doc) {
-        fprintf(stderr, "SKIP: cannot open tests/fixtures/object_stream.pdf\n");
+        fprintf(stderr, "FAIL: cannot open tests/fixtures/object_stream.pdf\n");
+        ++g_fail;
         return;
     }
 

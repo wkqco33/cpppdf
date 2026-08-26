@@ -6,24 +6,25 @@ namespace cpppdf::converter {
 
 namespace {
 
-static bool is_table_candidate(const Paragraph& paragraph, const BlockStats& stats,
-                               std::vector<std::vector<std::string>>* rows) {
+static bool is_table_candidate(const Paragraph &paragraph, const BlockStats &stats,
+                               std::vector<std::vector<std::string>> *rows) {
     if (paragraph.kind != ParagraphKind::Body || paragraph.lines.size() < 2)
         return false;
 
     const size_t column_count = paragraph.lines.front().segments.size();
-    if (column_count < 2) return false;
+    if (column_count < 2)
+        return false;
 
     const float tolerance = std::max(8.0f, stats.median_line_height * 0.75f);
     std::vector<float> anchors;
     anchors.reserve(column_count);
-    for (const auto& segment : paragraph.lines.front().segments)
+    for (const auto &segment : paragraph.lines.front().segments)
         anchors.push_back(segment.x);
 
     rows->clear();
     rows->reserve(paragraph.lines.size());
 
-    for (const auto& line : paragraph.lines) {
+    for (const auto &line : paragraph.lines) {
         if (line.segments.size() != column_count)
             return false;
 
@@ -44,9 +45,8 @@ static bool is_table_candidate(const Paragraph& paragraph, const BlockStats& sta
 
 } // namespace
 
-std::vector<Paragraph> detect_tables(std::vector<Paragraph> paragraphs,
-                                     const BlockStats& stats) {
-    for (auto& paragraph : paragraphs) {
+std::vector<Paragraph> detect_tables(std::vector<Paragraph> paragraphs, const BlockStats &stats) {
+    for (auto &paragraph : paragraphs) {
         std::vector<std::vector<std::string>> rows;
         if (!is_table_candidate(paragraph, stats, &rows))
             continue;

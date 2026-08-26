@@ -2,7 +2,7 @@
 #include "cpppdf/document.hpp"
 #include <iostream>
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
     if (argc < 2) {
         std::cerr << "Usage: ./example_03_extract_images <file.pdf>\n";
         return 1;
@@ -19,10 +19,9 @@ int main(int argc, char** argv) {
         auto images = cpppdf::extract_images(&doc, i);
         std::cout << "Page " << (i + 1) << ": found " << images.size() << " image(s)\n";
         for (size_t idx = 0; idx < images.size(); ++idx) {
-            const auto& img = images[idx];
-            std::cout << "  Image " << (idx + 1) << ": "
-                      << img.width << " x " << img.height << " px, RGBA ("
-                      << img.pixels.size() << " bytes)\n";
+            const auto &img = images[idx];
+            std::cout << "  Image " << (idx + 1) << ": " << img.width << " x " << img.height
+                      << " px, RGBA (" << img.pixels.size() << " bytes)\n";
             total_images++;
         }
     }

@@ -10,22 +10,22 @@ namespace cpppdf {
 class PdfDocumentImpl;
 
 class PdfDocument {
-public:
+  public:
     PdfDocument();
     ~PdfDocument();
-    PdfDocument(PdfDocument&&) noexcept;
-    PdfDocument& operator=(PdfDocument&&) noexcept;
+    PdfDocument(PdfDocument &&) noexcept;
+    PdfDocument &operator=(PdfDocument &&) noexcept;
 
-    PdfDocument(const PdfDocument&) = delete;
-    PdfDocument& operator=(const PdfDocument&) = delete;
+    PdfDocument(const PdfDocument &) = delete;
+    PdfDocument &operator=(const PdfDocument &) = delete;
 
-    bool load(const std::string& path);
+    bool load(const std::string &path);
 
-    int      page_count() const;
+    int page_count() const;
     PageInfo page_info(int index) const;
 
     // 간접 참조를 실제 오브젝트로 resolve
-    PdfObject resolve(const PdfObject& obj) const;
+    PdfObject resolve(const PdfObject &obj) const;
     PdfObject get_object(int32_t num, int32_t gen = 0) const;
 
     // 페이지 dict (resolve 완료)
@@ -39,7 +39,7 @@ public:
 
     bool is_loaded() const;
 
-private:
+  private:
     std::unique_ptr<PdfDocumentImpl> impl_;
 };
 

@@ -4,6 +4,6 @@
 
 namespace cpppdf::converter {
 
-std::vector<Line> assemble_lines(const NormalizationResult& normalized);
+std::vector<Line> assemble_lines(const NormalizationResult &normalized);
 
 } // namespace cpppdf::converter

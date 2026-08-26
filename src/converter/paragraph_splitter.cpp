@@ -13,10 +13,12 @@ static bool starts_with(std::string_view sv, std::string_view prefix) {
 }
 
 // Bullet 마커: ^\s*[-*•·]\s+
-static bool parse_bullet_marker(std::string_view text, size_t& content_pos) {
+static bool parse_bullet_marker(std::string_view text, size_t &content_pos) {
     size_t i = 0;
-    while (i < text.size() && (text[i] == ' ' || text[i] == '\t')) ++i;
-    if (i >= text.size()) return false;
+    while (i < text.size() && (text[i] == ' ' || text[i] == '\t'))
+        ++i;
+    if (i >= text.size())
+        return false;
 
     std::string_view sub = text.substr(i);
     size_t char_len = 0;
@@ -24,7 +26,7 @@ static bool parse_bullet_marker(std::string_view text, size_t& content_pos) {
         char_len = 1;
     } else if (starts_with(sub, "\xE2\x80\xA2")) { // •
         char_len = 3;
-    } else if (starts_with(sub, "\xC2\xB7")) {     // ·
+    } else if (starts_with(sub, "\xC2\xB7")) { // ·
         char_len = 2;
     } else {
         return false;
@@ -32,7 +34,8 @@ static bool parse_bullet_marker(std::string_view text, size_t& content_pos) {
     i += char_len;
 
     if (i < text.size() && (text[i] == ' ' || text[i] == '\t')) {
-        while (i < text.size() && (text[i] == ' ' || text[i] == '\t')) ++i;
+        while (i < text.size() && (text[i] == ' ' || text[i] == '\t'))
+            ++i;
         content_pos = i;
         return true;
     }
@@ -40,46 +43,52 @@ static bool parse_bullet_marker(std::string_view text, size_t& content_pos) {
 }
 
 // Ordered 마커: ^\s*\d+[.)]\s+
-static bool parse_ordered_marker(std::string_view text, size_t& content_pos) {
+static bool parse_ordered_marker(std::string_view text, size_t &content_pos) {
     size_t i = 0;
-    while (i < text.size() && (text[i] == ' ' || text[i] == '\t')) ++i;
-    if (i >= text.size() || !std::isdigit(static_cast<unsigned char>(text[i]))) return false;
+    while (i < text.size() && (text[i] == ' ' || text[i] == '\t'))
+        ++i;
+    if (i >= text.size() || !std::isdigit(static_cast<unsigned char>(text[i])))
+        return false;
 
-    while (i < text.size() && std::isdigit(static_cast<unsigned char>(text[i]))) ++i;
-    if (i >= text.size()) return false;
+    while (i < text.size() && std::isdigit(static_cast<unsigned char>(text[i])))
+        ++i;
+    if (i >= text.size())
+        return false;
 
-    if (text[i] != '.' && text[i] != ')') return false;
+    if (text[i] != '.' && text[i] != ')')
+        return false;
     ++i;
 
     if (i < text.size() && (text[i] == ' ' || text[i] == '\t')) {
-        while (i < text.size() && (text[i] == ' ' || text[i] == '\t')) ++i;
+        while (i < text.size() && (text[i] == ' ' || text[i] == '\t'))
+            ++i;
         content_pos = i;
         return true;
     }
     return false;
 }
 
-static Paragraph build_body_or_list(const std::vector<Line>& chunk) {
+static Paragraph build_body_or_list(const std::vector<Line> &chunk) {
     Paragraph paragraph;
-    paragraph.kind         = ParagraphKind::Body;
-    paragraph.role         = BlockRole::Body;
+    paragraph.kind = ParagraphKind::Body;
+    paragraph.role = BlockRole::Body;
     paragraph.indent_level = chunk.empty() ? 0 : chunk.front().indent_level;
-    paragraph.lines        = chunk;
+    paragraph.lines = chunk;
 
-    if (chunk.empty()) return paragraph;
+    if (chunk.empty())
+        return paragraph;
 
     size_t dummy_pos = 0;
-    const bool bullet_first  = parse_bullet_marker(chunk.front().text, dummy_pos);
+    const bool bullet_first = parse_bullet_marker(chunk.front().text, dummy_pos);
     const bool ordered_first = parse_ordered_marker(chunk.front().text, dummy_pos);
 
     if (!bullet_first && !ordered_first)
         return paragraph;
 
-    paragraph.kind = bullet_first ? ParagraphKind::BulletList
-                                  : ParagraphKind::OrderedList;
+    paragraph.kind = bullet_first ? ParagraphKind::BulletList : ParagraphKind::OrderedList;
     paragraph.items.clear();
 
-    for (const auto& line : chunk) {
+    for (const auto &line : chunk) {
         size_t content_pos = 0;
         bool match = bullet_first ? parse_bullet_marker(line.text, content_pos)
                                   : parse_ordered_marker(line.text, content_pos);
@@ -103,28 +112,29 @@ static Paragraph build_body_or_list(const std::vector<Line>& chunk) {
 
 } // namespace
 
-std::vector<Paragraph> split_paragraphs(const std::vector<Line>& lines,
-                                        const BlockStats& stats) {
+std::vector<Paragraph> split_paragraphs(const std::vector<Line> &lines, const BlockStats &stats) {
     std::vector<Paragraph> paragraphs;
-    if (lines.empty()) return paragraphs;
+    if (lines.empty())
+        return paragraphs;
 
     std::vector<Line> chunk;
 
     auto flush_chunk = [&]() {
-        if (chunk.empty()) return;
+        if (chunk.empty())
+            return;
         paragraphs.push_back(build_body_or_list(chunk));
         chunk.clear();
     };
 
     for (size_t i = 0; i < lines.size(); ++i) {
-        const Line& line = lines[i];
+        const Line &line = lines[i];
 
         if (line.role != BlockRole::Body) {
             flush_chunk();
 
             Paragraph heading;
-            heading.kind         = ParagraphKind::Heading;
-            heading.role         = line.role;
+            heading.kind = ParagraphKind::Heading;
+            heading.role = line.role;
             heading.indent_level = line.indent_level;
             heading.lines.push_back(line);
             paragraphs.push_back(std::move(heading));
@@ -136,8 +146,8 @@ std::vector<Paragraph> split_paragraphs(const std::vector<Line>& lines,
             continue;
         }
 
-        const Line& prev = chunk.back();
-        const float gap  = prev.y - line.y;
+        const Line &prev = chunk.back();
+        const float gap = prev.y - line.y;
 
         if (gap > stats.median_line_height * 1.4f) {
             flush_chunk();

@@ -8,6 +8,6 @@ class PdfDocument;
 
 namespace cpppdf::extractor {
 
-std::vector<TextBlock> extract_text(const PdfDocument& doc, int page_index);
+std::vector<TextBlock> extract_text(const PdfDocument &doc, int page_index);
 
 } // namespace cpppdf::extractor

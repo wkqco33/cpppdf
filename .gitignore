@@ -5,6 +5,9 @@ dist/
 *.bak
 *.swp
 vcpkg_installed/
+*.gcov
+*.gcda
+*.gcno
 
 # Created by https://www.toptal.com/developers/gitignore/api/c,c++,cmake,linux,macos,visualstudiocode,windows
 # Edit at https://www.toptal.com/developers/gitignore?templates=c,c++,cmake,linux,macos,visualstudiocode,windows

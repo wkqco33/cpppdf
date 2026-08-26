@@ -8,28 +8,34 @@ namespace {
 
 constexpr int role_rank(BlockRole role) noexcept {
     switch (role) {
-        case BlockRole::H1:   return 3;
-        case BlockRole::H2:   return 2;
-        case BlockRole::H3:   return 1;
-        case BlockRole::Body: return 0;
+    case BlockRole::H1:
+        return 3;
+    case BlockRole::H2:
+        return 2;
+    case BlockRole::H3:
+        return 1;
+    case BlockRole::Body:
+        return 0;
     }
     return 0;
 }
 
 } // namespace
 
-std::vector<Line> assemble_lines(const NormalizationResult& normalized) {
+std::vector<Line> assemble_lines(const NormalizationResult &normalized) {
     std::vector<Line> lines;
-    if (normalized.blocks.empty()) return lines;
+    if (normalized.blocks.empty())
+        return lines;
 
-    std::vector<const NormalizedBlock*> current;
+    std::vector<const NormalizedBlock *> current;
     float current_y = normalized.blocks.front().block.y;
 
     auto flush = [&]() {
-        if (current.empty()) return;
+        if (current.empty())
+            return;
 
         std::sort(current.begin(), current.end(),
-                  [](const NormalizedBlock* a, const NormalizedBlock* b) {
+                  [](const NormalizedBlock *a, const NormalizedBlock *b) {
                       return a->block.x < b->block.x;
                   });
 
@@ -39,15 +45,15 @@ std::vector<Line> assemble_lines(const NormalizationResult& normalized) {
         line.indent_level = current.front()->indent_level;
 
         size_t estimated_size = 0;
-        for (const NormalizedBlock* block : current)
+        for (const NormalizedBlock *block : current)
             estimated_size += block->block.text.size() + 1;
         line.text.reserve(estimated_size);
 
-        for (const NormalizedBlock* block : current) {
+        for (const NormalizedBlock *block : current) {
             LineSegment segment;
-            segment.text         = block->block.text;
-            segment.x            = block->block.x;
-            segment.role         = block->role;
+            segment.text = block->block.text;
+            segment.x = block->block.x;
+            segment.role = block->role;
             segment.indent_level = block->indent_level;
             line.segments.push_back(std::move(segment));
 
@@ -64,7 +70,7 @@ std::vector<Line> assemble_lines(const NormalizationResult& normalized) {
         current.clear();
     };
 
-    for (const auto& block : normalized.blocks) {
+    for (const auto &block : normalized.blocks) {
         if (current.empty()) {
             current.push_back(&block);
             current_y = block.block.y;

@@ -5,9 +5,9 @@ namespace cpppdf::converter {
 
 namespace {
 
-static std::string join_lines(const std::vector<Line>& lines) {
+static std::string join_lines(const std::vector<Line> &lines) {
     std::string text;
-    for (const auto& line : lines) {
+    for (const auto &line : lines) {
         if (!text.empty())
             text += ' ';
         text += line.text;
@@ -26,72 +26,76 @@ static std::string escape_cell(std::string text) {
 
 static int heading_level(BlockRole role) {
     switch (role) {
-        case BlockRole::H1:   return 1;
-        case BlockRole::H2:   return 2;
-        case BlockRole::H3:   return 3;
-        case BlockRole::Body: return 0;
+    case BlockRole::H1:
+        return 1;
+    case BlockRole::H2:
+        return 2;
+    case BlockRole::H3:
+        return 3;
+    case BlockRole::Body:
+        return 0;
     }
     return 0;
 }
 
 } // namespace
 
-std::string render_markdown(const std::vector<Paragraph>& paragraphs) {
+std::string render_markdown(const std::vector<Paragraph> &paragraphs) {
     std::ostringstream out;
 
-    for (const auto& paragraph : paragraphs) {
+    for (const auto &paragraph : paragraphs) {
         switch (paragraph.kind) {
-            case ParagraphKind::Heading: {
-                const int level = heading_level(paragraph.role);
-                out << std::string(static_cast<size_t>(level), '#') << ' '
-                    << join_lines(paragraph.lines) << "\n\n";
+        case ParagraphKind::Heading: {
+            const int level = heading_level(paragraph.role);
+            out << std::string(static_cast<size_t>(level), '#') << ' '
+                << join_lines(paragraph.lines) << "\n\n";
+            break;
+        }
+
+        case ParagraphKind::Body:
+            out << join_lines(paragraph.lines) << "\n\n";
+            break;
+
+        case ParagraphKind::BulletList: {
+            const std::string indent(static_cast<size_t>(paragraph.indent_level * 2), ' ');
+            for (const auto &item : paragraph.items)
+                out << indent << "- " << item << '\n';
+            out << '\n';
+            break;
+        }
+
+        case ParagraphKind::OrderedList: {
+            const std::string indent(static_cast<size_t>(paragraph.indent_level * 2), ' ');
+            for (const auto &item : paragraph.items)
+                out << indent << "1. " << item << '\n';
+            out << '\n';
+            break;
+        }
+
+        case ParagraphKind::Table: {
+            if (paragraph.table_rows.empty())
                 break;
-            }
 
-            case ParagraphKind::Body:
-                out << join_lines(paragraph.lines) << "\n\n";
-                break;
+            const auto &header = paragraph.table_rows.front();
+            out << '|';
+            for (const auto &cell : header)
+                out << ' ' << escape_cell(cell) << " |";
+            out << '\n';
 
-            case ParagraphKind::BulletList: {
-                const std::string indent(static_cast<size_t>(paragraph.indent_level * 2), ' ');
-                for (const auto& item : paragraph.items)
-                    out << indent << "- " << item << '\n';
-                out << '\n';
-                break;
-            }
+            out << '|';
+            for (size_t i = 0; i < header.size(); ++i)
+                out << " --- |";
+            out << '\n';
 
-            case ParagraphKind::OrderedList: {
-                const std::string indent(static_cast<size_t>(paragraph.indent_level * 2), ' ');
-                for (const auto& item : paragraph.items)
-                    out << indent << "1. " << item << '\n';
-                out << '\n';
-                break;
-            }
-
-            case ParagraphKind::Table: {
-                if (paragraph.table_rows.empty())
-                    break;
-
-                const auto& header = paragraph.table_rows.front();
+            for (size_t row = 1; row < paragraph.table_rows.size(); ++row) {
                 out << '|';
-                for (const auto& cell : header)
+                for (const auto &cell : paragraph.table_rows[row])
                     out << ' ' << escape_cell(cell) << " |";
                 out << '\n';
-
-                out << '|';
-                for (size_t i = 0; i < header.size(); ++i)
-                    out << " --- |";
-                out << '\n';
-
-                for (size_t row = 1; row < paragraph.table_rows.size(); ++row) {
-                    out << '|';
-                    for (const auto& cell : paragraph.table_rows[row])
-                        out << ' ' << escape_cell(cell) << " |";
-                    out << '\n';
-                }
-                out << '\n';
-                break;
             }
+            out << '\n';
+            break;
+        }
         }
     }
 

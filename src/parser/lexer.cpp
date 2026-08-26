@@ -5,18 +5,16 @@
 
 namespace cpppdf::parser {
 
-Lexer::Lexer(const uint8_t* data, size_t size, size_t start)
+Lexer::Lexer(const uint8_t *data, size_t size, size_t start)
     : buf_(data), size_(size), pos_(start) {}
 
 bool Lexer::is_ws(uint8_t c) const {
-    return c == 0x00 || c == 0x09 || c == 0x0A ||
-           c == 0x0C || c == 0x0D || c == 0x20;
+    return c == 0x00 || c == 0x09 || c == 0x0A || c == 0x0C || c == 0x0D || c == 0x20;
 }
 
 bool Lexer::is_delim(uint8_t c) const {
-    return c == '(' || c == ')' || c == '<' || c == '>' ||
-           c == '[' || c == ']' || c == '{' || c == '}' ||
-           c == '/' || c == '%';
+    return c == '(' || c == ')' || c == '<' || c == '>' || c == '[' || c == ']' || c == '{' ||
+           c == '}' || c == '/' || c == '%';
 }
 
 void Lexer::skip_ws() {
@@ -60,7 +58,10 @@ Token Lexer::next() {
 
     uint8_t c = buf_[pos_];
 
-    if (c == '(') { ++pos_; return read_str_lit(); }
+    if (c == '(') {
+        ++pos_;
+        return read_str_lit();
+    }
 
     if (c == '<') {
         if (pos_ + 1 < size_ && buf_[pos_ + 1] == '<') {
@@ -83,10 +84,21 @@ Token Lexer::next() {
         return next();
     }
 
-    if (c == '[') { ++pos_; t.type = TokType::ArrBegin; return t; }
-    if (c == ']') { ++pos_; t.type = TokType::ArrEnd;   return t; }
+    if (c == '[') {
+        ++pos_;
+        t.type = TokType::ArrBegin;
+        return t;
+    }
+    if (c == ']') {
+        ++pos_;
+        t.type = TokType::ArrEnd;
+        return t;
+    }
 
-    if (c == '/') { ++pos_; return read_name(); }
+    if (c == '/') {
+        ++pos_;
+        return read_name();
+    }
 
     return read_number_or_kw();
 }
@@ -95,7 +107,7 @@ Token Lexer::read_str_lit() {
     // '(' 는 이미 소비됨
     Token t;
     t.type = TokType::StrLit;
-    t.pos  = pos_ - 1;
+    t.pos = pos_ - 1;
 
     int depth = 1;
     while (pos_ < size_ && depth > 0) {
@@ -105,36 +117,57 @@ Token Lexer::read_str_lit() {
             ++depth;
             t.sv += '(';
         } else if (ch == ')') {
-            if (--depth > 0) t.sv += ')';
+            if (--depth > 0)
+                t.sv += ')';
         } else if (ch == '\\') {
-            if (pos_ >= size_) break;
+            if (pos_ >= size_)
+                break;
             uint8_t esc = buf_[pos_++];
             switch (esc) {
-                case 'n':  t.sv += '\n'; break;
-                case 'r':  t.sv += '\r'; break;
-                case 't':  t.sv += '\t'; break;
-                case 'b':  t.sv += '\b'; break;
-                case 'f':  t.sv += '\f'; break;
-                case '(':  t.sv += '(';  break;
-                case ')':  t.sv += ')';  break;
-                case '\\': t.sv += '\\'; break;
-                case '\r':
-                    if (pos_ < size_ && buf_[pos_] == '\n') ++pos_;
-                    break;
-                case '\n': break; // 줄 계속
-                default:
-                    if (esc >= '0' && esc <= '7') {
-                        int oct = esc - '0';
-                        for (int k = 0; k < 2 && pos_ < size_; k++) {
-                            uint8_t nc = buf_[pos_];
-                            if (nc < '0' || nc > '7') break;
-                            oct = oct * 8 + (nc - '0');
-                            ++pos_;
-                        }
-                        t.sv += static_cast<char>(oct & 0xFF);
-                    } else {
-                        t.sv += static_cast<char>(esc);
+            case 'n':
+                t.sv += '\n';
+                break;
+            case 'r':
+                t.sv += '\r';
+                break;
+            case 't':
+                t.sv += '\t';
+                break;
+            case 'b':
+                t.sv += '\b';
+                break;
+            case 'f':
+                t.sv += '\f';
+                break;
+            case '(':
+                t.sv += '(';
+                break;
+            case ')':
+                t.sv += ')';
+                break;
+            case '\\':
+                t.sv += '\\';
+                break;
+            case '\r':
+                if (pos_ < size_ && buf_[pos_] == '\n')
+                    ++pos_;
+                break;
+            case '\n':
+                break; // 줄 계속
+            default:
+                if (esc >= '0' && esc <= '7') {
+                    int oct = esc - '0';
+                    for (int k = 0; k < 2 && pos_ < size_; k++) {
+                        uint8_t nc = buf_[pos_];
+                        if (nc < '0' || nc > '7')
+                            break;
+                        oct = oct * 8 + (nc - '0');
+                        ++pos_;
                     }
+                    t.sv += static_cast<char>(oct & 0xFF);
+                } else {
+                    t.sv += static_cast<char>(esc);
+                }
             }
         } else {
             t.sv += static_cast<char>(ch);
@@ -147,23 +180,28 @@ Token Lexer::read_str_hex() {
     // '<' 는 이미 소비됨
     Token t;
     t.type = TokType::StrHex;
-    t.pos  = pos_ - 1;
+    t.pos = pos_ - 1;
 
     std::string hex;
     while (pos_ < size_ && buf_[pos_] != '>') {
         uint8_t ch = buf_[pos_++];
-        if (std::isxdigit(ch)) hex += static_cast<char>(ch);
+        if (std::isxdigit(ch))
+            hex += static_cast<char>(ch);
         // 공백 무시
     }
-    if (pos_ < size_) ++pos_; // '>' 소비
+    if (pos_ < size_)
+        ++pos_; // '>' 소비
 
-    if (hex.size() % 2 != 0) hex += '0'; // 홀수 패딩
+    if (hex.size() % 2 != 0)
+        hex += '0'; // 홀수 패딩
 
     t.sv.reserve(hex.size() / 2);
     for (size_t k = 0; k < hex.size(); k += 2) {
         auto from_hex = [](char ch) -> uint8_t {
-            if (ch >= '0' && ch <= '9') return static_cast<uint8_t>(ch - '0');
-            if (ch >= 'a' && ch <= 'f') return static_cast<uint8_t>(ch - 'a' + 10);
+            if (ch >= '0' && ch <= '9')
+                return static_cast<uint8_t>(ch - '0');
+            if (ch >= 'a' && ch <= 'f')
+                return static_cast<uint8_t>(ch - 'a' + 10);
             return static_cast<uint8_t>(ch - 'A' + 10);
         };
         uint8_t hi = from_hex(hex[k]);
@@ -177,7 +215,7 @@ Token Lexer::read_name() {
     // '/' 는 이미 소비됨
     Token t;
     t.type = TokType::Name;
-    t.pos  = pos_ - 1;
+    t.pos = pos_ - 1;
 
     while (pos_ < size_ && is_regular(buf_[pos_])) {
         uint8_t ch = buf_[pos_];
@@ -185,8 +223,10 @@ Token Lexer::read_name() {
             uint8_t h = buf_[pos_ + 1], l = buf_[pos_ + 2];
             if (std::isxdigit(h) && std::isxdigit(l)) {
                 auto from_hex = [](uint8_t c) -> uint8_t {
-                    if (c >= '0' && c <= '9') return static_cast<uint8_t>(c - '0');
-                    if (c >= 'a' && c <= 'f') return static_cast<uint8_t>(c - 'a' + 10);
+                    if (c >= '0' && c <= '9')
+                        return static_cast<uint8_t>(c - '0');
+                    if (c >= 'a' && c <= 'f')
+                        return static_cast<uint8_t>(c - 'a' + 10);
                     return static_cast<uint8_t>(c - 'A' + 10);
                 };
                 t.sv += static_cast<char>((from_hex(h) << 4) | from_hex(l));
@@ -215,29 +255,43 @@ Token Lexer::read_number_or_kw() {
     }
 
     // bool / null
-    if (raw == "true")  { t.type = TokType::Bool; t.bv = true;  return t; }
-    if (raw == "false") { t.type = TokType::Bool; t.bv = false; return t; }
-    if (raw == "null")  { t.type = TokType::Null; return t; }
+    if (raw == "true") {
+        t.type = TokType::Bool;
+        t.bv = true;
+        return t;
+    }
+    if (raw == "false") {
+        t.type = TokType::Bool;
+        t.bv = false;
+        return t;
+    }
+    if (raw == "null") {
+        t.type = TokType::Null;
+        return t;
+    }
 
     // 알려진 키워드
-    if (raw == "obj"      || raw == "endobj"   || raw == "stream" ||
-        raw == "endstream"|| raw == "xref"     || raw == "trailer" ||
-        raw == "startxref"|| raw == "R"        || raw == "f" || raw == "n") {
+    if (raw == "obj" || raw == "endobj" || raw == "stream" || raw == "endstream" || raw == "xref" ||
+        raw == "trailer" || raw == "startxref" || raw == "R" || raw == "f" || raw == "n") {
         t.type = TokType::Keyword;
-        t.sv   = raw;
+        t.sv = raw;
         return t;
     }
 
     // 숫자 시도: 선택적 부호 + 자릿수 + 선택적 소수점
-    bool has_dot  = false;
-    bool valid    = true;
-    size_t start  = 0;
+    bool has_dot = false;
+    bool valid = true;
+    size_t start = 0;
 
-    if (!raw.empty() && (raw[0] == '+' || raw[0] == '-')) start = 1;
+    if (!raw.empty() && (raw[0] == '+' || raw[0] == '-'))
+        start = 1;
 
     for (size_t k = start; k < raw.size(); k++) {
         if (raw[k] == '.') {
-            if (has_dot) { valid = false; break; }
+            if (has_dot) {
+                valid = false;
+                break;
+            }
             has_dot = true;
         } else if (!std::isdigit(static_cast<unsigned char>(raw[k]))) {
             valid = false;
@@ -250,20 +304,21 @@ Token Lexer::read_number_or_kw() {
         try {
             if (has_dot) {
                 t.type = TokType::Real;
-                t.rv   = std::stod(raw);
+                t.rv = std::stod(raw);
             } else {
                 t.type = TokType::Int;
-                t.iv   = std::stoll(raw);
+                t.iv = std::stoll(raw);
             }
         } catch (...) {
             valid = false;
         }
-        if (valid) return t;
+        if (valid)
+            return t;
     }
 
     // 그 외는 keyword로 처리 (%%EOF 등)
     t.type = TokType::Keyword;
-    t.sv   = raw;
+    t.sv = raw;
     return t;
 }
 

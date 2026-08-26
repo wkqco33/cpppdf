@@ -4,7 +4,6 @@
 
 namespace cpppdf::converter {
 
-std::vector<Paragraph> detect_tables(std::vector<Paragraph> paragraphs,
-                                     const BlockStats& stats);
+std::vector<Paragraph> detect_tables(std::vector<Paragraph> paragraphs, const BlockStats &stats);
 
 } // namespace cpppdf::converter

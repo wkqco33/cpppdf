@@ -4,6 +4,6 @@
 
 namespace cpppdf::converter {
 
-NormalizationResult normalize_blocks(const std::vector<TextBlock>& blocks);
+NormalizationResult normalize_blocks(const std::vector<TextBlock> &blocks);
 
 } // namespace cpppdf::converter

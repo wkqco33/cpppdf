@@ -6,12 +6,17 @@
 
 static int g_pass = 0, g_fail = 0;
 
-#define CHECK(cond) do { \
-    if (cond) { ++g_pass; } \
-    else { ++g_fail; fprintf(stderr, "FAIL: %s (%s:%d)\n", #cond, __FILE__, __LINE__); } \
-} while(0)
+#define CHECK(cond)                                                                                \
+    do {                                                                                           \
+        if (cond) {                                                                                \
+            ++g_pass;                                                                              \
+        } else {                                                                                   \
+            ++g_fail;                                                                              \
+            fprintf(stderr, "FAIL: %s (%s:%d)\n", #cond, __FILE__, __LINE__);                      \
+        }                                                                                          \
+    } while (0)
 
-static cpppdf::TextBlock block(float x, float y, float font_size, const char* text) {
+static cpppdf::TextBlock block(float x, float y, float font_size, const char *text) {
     cpppdf::TextBlock out;
     out.x = x;
     out.y = y;
@@ -49,7 +54,8 @@ static void test_convert_blocks_to_markdown() {
 static void test_convert_document_sample() {
     cpppdf::PdfDocument doc;
     if (!doc.load("tests/fixtures/sample.pdf")) {
-        fprintf(stderr, "SKIP: cannot load sample.pdf\n");
+        fprintf(stderr, "FAIL: cannot load sample.pdf\n");
+        ++g_fail;
         return;
     }
 
@@ -61,13 +67,13 @@ static void test_convert_document_sample() {
 static void test_convert_document_with_image_links() {
     cpppdf::PdfDocument doc;
     if (!doc.load("tests/fixtures/sample.pdf")) {
-        fprintf(stderr, "SKIP: cannot load sample.pdf\n");
+        fprintf(stderr, "FAIL: cannot load sample.pdf\n");
+        ++g_fail;
         return;
     }
 
     std::vector<std::vector<std::string>> page_links = {
-        {"sample_images/page0_img0.ppm", "sample_images/page0_img1.ppm"}
-    };
+        {"sample_images/page0_img0.ppm", "sample_images/page0_img1.ppm"}};
     const std::string markdown = cpppdf::converter::convert_document_to_markdown(
         doc, cpppdf::converter::Pdf2MdOptions{0, &page_links});
 

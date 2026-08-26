@@ -2,9 +2,9 @@
 #include "../document/document.hpp"
 #include "../extractor/text.hpp"
 #include <algorithm>
+#include <cctype>
 #include <cstdio>
 #include <cstring>
-#include <cctype>
 #include <map>
 #include <string>
 #include <sys/ioctl.h>
@@ -15,9 +15,10 @@ namespace cpppdf::renderer {
 
 namespace {
 
-static bool is_visible_text(const std::string& text) {
+static bool is_visible_text(const std::string &text) {
     for (unsigned char ch : text) {
-        if (!std::isspace(ch)) return true;
+        if (!std::isspace(ch))
+            return true;
     }
     return false;
 }
@@ -27,14 +28,12 @@ struct Utf8Prefix {
     int chars = 0;
 };
 
-static Utf8Prefix next_utf8_char(const std::string& text, size_t offset) {
+static Utf8Prefix next_utf8_char(const std::string &text, size_t offset) {
     if (offset >= text.size()) {
         return {};
     }
     const auto c = static_cast<uint8_t>(text[offset]);
-    const int seq = (c < 0x80u) ? 1 :
-                    (c < 0xE0u) ? 2 :
-                    (c < 0xF0u) ? 3 : 4;
+    const int seq = (c < 0x80u) ? 1 : (c < 0xE0u) ? 2 : (c < 0xF0u) ? 3 : 4;
     if (offset + static_cast<size_t>(seq) > text.size()) {
         return {};
     }
@@ -68,12 +67,12 @@ constexpr int kHorizontalPadding = 4;
 constexpr int kVerticalPadding = 1;
 constexpr int kMinInnerWidthPadding = 6;
 
-static BlockBounds compute_bounds(const std::vector<TextBlock>& blocks) {
+static BlockBounds compute_bounds(const std::vector<TextBlock> &blocks) {
     BlockBounds bounds;
     bounds.min_x = bounds.max_x = blocks.front().x;
     bounds.min_y = bounds.max_y = blocks.front().y;
 
-    for (const auto& block : blocks) {
+    for (const auto &block : blocks) {
         bounds.min_x = std::min(bounds.min_x, block.x);
         bounds.max_x = std::max(bounds.max_x, block.x);
         bounds.min_y = std::min(bounds.min_y, block.y);
@@ -96,9 +95,9 @@ static PageLayout compute_page_layout(PageInfo page_info, int term_cols, int ter
 
     const float page_width = std::max(1.0F, page_info.width);
     const float page_height = std::max(1.0F, page_info.height);
-    const float scale = std::min(static_cast<float>(max_content_cols) / page_width,
-                                 static_cast<float>(max_content_rows) * kTerminalCellAspect /
-                                     page_height);
+    const float scale =
+        std::min(static_cast<float>(max_content_cols) / page_width,
+                 static_cast<float>(max_content_rows) * kTerminalCellAspect / page_height);
 
     layout.content_cols = std::max(1, static_cast<int>(page_width * scale));
     layout.content_rows = std::max(1, static_cast<int>(page_height * scale / kTerminalCellAspect));
@@ -108,7 +107,8 @@ static PageLayout compute_page_layout(PageInfo page_info, int term_cols, int ter
     return layout;
 }
 
-static int write_utf8_cells(std::vector<std::string>& cells, int start_col, const std::string& text) {
+static int write_utf8_cells(std::vector<std::string> &cells, int start_col,
+                            const std::string &text) {
     int col = start_col;
     size_t offset = 0;
     while (offset < text.size() && col < static_cast<int>(cells.size())) {
@@ -123,7 +123,7 @@ static int write_utf8_cells(std::vector<std::string>& cells, int start_col, cons
     return col - start_col;
 }
 
-static char border_at(const PageLayout& layout, int row, int col) {
+static char border_at(const PageLayout &layout, int row, int col) {
     if (!layout.has_border) {
         return '\0';
     }
@@ -159,18 +159,19 @@ static int clamp_start(int start, int span, int limit) {
 static int aspect_rows_for_cols(PageInfo page_info, int content_cols) {
     const float page_width = std::max(1.0F, page_info.width);
     const float page_height = std::max(1.0F, page_info.height);
-    return std::max(1, static_cast<int>(
-        (static_cast<float>(content_cols) * page_height) / (page_width * kTerminalCellAspect)));
+    return std::max(1, static_cast<int>((static_cast<float>(content_cols) * page_height) /
+                                        (page_width * kTerminalCellAspect)));
 }
 
 static int aspect_cols_for_rows(PageInfo page_info, int content_rows) {
     const float page_width = std::max(1.0F, page_info.width);
     const float page_height = std::max(1.0F, page_info.height);
-    return std::max(1, static_cast<int>(
-        (static_cast<float>(content_rows) * page_width * kTerminalCellAspect) / page_height));
+    return std::max(
+        1, static_cast<int>((static_cast<float>(content_rows) * page_width * kTerminalCellAspect) /
+                            page_height));
 }
 
-static ContentWindow compute_content_window(const std::vector<std::vector<std::string>>& content) {
+static ContentWindow compute_content_window(const std::vector<std::vector<std::string>> &content) {
     ContentWindow window;
     if (content.empty() || content.front().empty()) {
         return window;
@@ -184,7 +185,7 @@ static ContentWindow compute_content_window(const std::vector<std::vector<std::s
     int used_top = static_cast<int>(content.size());
     int used_bottom = -1;
     for (size_t row_index = 0; row_index < content.size(); ++row_index) {
-        const auto& row = content[row_index];
+        const auto &row = content[row_index];
         int row_left = static_cast<int>(row.size());
         int row_right = -1;
         for (size_t col = 0; col < row.size(); ++col) {
@@ -230,8 +231,7 @@ static auto right_trim(std::string line) -> std::string {
 
 std::pair<int, int> terminal_size() {
     struct winsize ws;
-    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0 &&
-        ws.ws_col > 0 && ws.ws_row > 0)
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0 && ws.ws_col > 0 && ws.ws_row > 0)
         return {ws.ws_col, ws.ws_row};
     return {80, 24};
 }
@@ -239,11 +239,10 @@ std::pair<int, int> terminal_size() {
 // ---- 이미지 렌더링 ----
 
 // nearest-neighbor로 (out_w, out_h) 크기의 RGBA 버퍼 생성
-static std::vector<uint8_t>
-scale_image(const ImageData& img, int out_w, int out_h) {
+static std::vector<uint8_t> scale_image(const ImageData &img, int out_w, int out_h) {
     std::vector<uint8_t> out(static_cast<size_t>(out_w * out_h * 4));
 
-    float sx = static_cast<float>(img.width)  / out_w;
+    float sx = static_cast<float>(img.width) / out_w;
     float sy = static_cast<float>(img.height) / out_h;
 
     for (int y = 0; y < out_h; y++) {
@@ -258,12 +257,15 @@ scale_image(const ImageData& img, int out_w, int out_h) {
     return out;
 }
 
-void render_image(const ImageData& img, int max_cols, int max_rows) {
-    if (img.width == 0 || img.height == 0 || img.pixels.empty()) return;
+void render_image(const ImageData &img, int max_cols, int max_rows) {
+    if (img.width == 0 || img.height == 0 || img.pixels.empty())
+        return;
 
     auto [tw, th] = terminal_size();
-    if (max_cols <= 0) max_cols = tw;
-    if (max_rows <= 0) max_rows = th - 1;
+    if (max_cols <= 0)
+        max_cols = tw;
+    if (max_rows <= 0)
+        max_rows = th - 1;
 
     // ▀ 트릭: 한 셀 = 2 픽셀 행
     // 터미널 셀은 대략 높이:너비 = 2:1 이므로 이미지 픽셀 비율과 맞춤
@@ -271,11 +273,12 @@ void render_image(const ImageData& img, int max_cols, int max_rows) {
     int px_h = max_rows * 2;
 
     // 종횡비 유지
-    float scale = std::min(static_cast<float>(px_w) / img.width,
-                           static_cast<float>(px_h) / img.height);
-    int out_w = std::max(1, static_cast<int>(img.width  * scale));
+    float scale =
+        std::min(static_cast<float>(px_w) / img.width, static_cast<float>(px_h) / img.height);
+    int out_w = std::max(1, static_cast<int>(img.width * scale));
     int out_h = std::max(2, static_cast<int>(img.height * scale));
-    if (out_h % 2 != 0) out_h--;
+    if (out_h % 2 != 0)
+        out_h--;
 
     auto scaled = scale_image(img, out_w, out_h);
 
@@ -283,7 +286,7 @@ void render_image(const ImageData& img, int max_cols, int max_rows) {
     std::string buf;
     buf.reserve(static_cast<size_t>(out_w * (out_h / 2)) * 40);
 
-    auto pixel = [&](int x, int y) -> const uint8_t* {
+    auto pixel = [&](int x, int y) -> const uint8_t * {
         y = std::clamp(y, 0, out_h - 1);
         x = std::clamp(x, 0, out_w - 1);
         return scaled.data() + static_cast<size_t>((y * out_w + x) * 4);
@@ -297,20 +300,23 @@ void render_image(const ImageData& img, int max_cols, int max_rows) {
         prev_tr = prev_tg = prev_tb = -1;
         prev_br = prev_bg = prev_bb = -1;
         for (int x = 0; x < out_w; x++) {
-            const uint8_t* top = pixel(x, y);
-            const uint8_t* bot = pixel(x, y + 1);
+            const uint8_t *top = pixel(x, y);
+            const uint8_t *bot = pixel(x, y + 1);
 
             int tr = top[0], tg = top[1], tb = top[2];
             int br = bot[0], bg = bot[1], bb = bot[2];
 
-            if (tr != prev_tr || tg != prev_tg || tb != prev_tb ||
-                br != prev_br || bg != prev_bg || bb != prev_bb) {
-                snprintf(esc, sizeof(esc),
-                         "\033[38;2;%d;%d;%d;48;2;%d;%d;%dm",
-                         tr, tg, tb, br, bg, bb);
+            if (tr != prev_tr || tg != prev_tg || tb != prev_tb || br != prev_br || bg != prev_bg ||
+                bb != prev_bb) {
+                snprintf(esc, sizeof(esc), "\033[38;2;%d;%d;%d;48;2;%d;%d;%dm", tr, tg, tb, br, bg,
+                         bb);
                 buf += esc;
-                prev_tr = tr; prev_tg = tg; prev_tb = tb;
-                prev_br = br; prev_bg = bg; prev_bb = bb;
+                prev_tr = tr;
+                prev_tg = tg;
+                prev_tb = tb;
+                prev_br = br;
+                prev_bg = bg;
+                prev_bb = bb;
             }
             buf += "\xe2\x96\x80"; // ▀
         }
@@ -324,11 +330,12 @@ void render_image(const ImageData& img, int max_cols, int max_rows) {
 
 // ---- 텍스트 렌더링 ----
 
-void render_text(const PdfDocument& doc, int page_index,
-                  int term_cols, int term_rows) {
+void render_text(const PdfDocument &doc, int page_index, int term_cols, int term_rows) {
     auto [tw, th] = terminal_size();
-    if (term_cols <= 0) term_cols = tw;
-    if (term_rows <= 0) term_rows = th - 1;
+    if (term_cols <= 0)
+        term_cols = tw;
+    if (term_rows <= 0)
+        term_rows = th - 1;
 
     auto raw_blocks = extractor::extract_text(doc, page_index);
     if (raw_blocks.empty()) {
@@ -338,7 +345,7 @@ void render_text(const PdfDocument& doc, int page_index,
 
     std::vector<TextBlock> blocks;
     blocks.reserve(raw_blocks.size());
-    for (auto& block : raw_blocks) {
+    for (auto &block : raw_blocks) {
         if (is_visible_text(block.text))
             blocks.push_back(std::move(block));
     }
@@ -373,8 +380,8 @@ void render_text(const PdfDocument& doc, int page_index,
         return static_cast<int>(norm * std::max(0, layout.content_rows - 1));
     };
 
-    std::vector<std::vector<const TextBlock*>> lines(static_cast<size_t>(layout.content_rows));
-    for (const auto& b : blocks) {
+    std::vector<std::vector<const TextBlock *>> lines(static_cast<size_t>(layout.content_rows));
+    for (const auto &b : blocks) {
         const int row = to_row(b.y);
         if (row >= 0 && row < layout.content_rows)
             lines[static_cast<size_t>(row)].push_back(&b);
@@ -385,19 +392,17 @@ void render_text(const PdfDocument& doc, int page_index,
         std::vector<std::string>(static_cast<size_t>(layout.content_cols), " "));
 
     for (size_t row_index = 0; row_index < lines.size(); ++row_index) {
-        auto& row_blocks = lines[row_index];
+        auto &row_blocks = lines[row_index];
         if (row_blocks.empty()) {
             continue;
         }
         std::sort(row_blocks.begin(), row_blocks.end(),
-                  [](const TextBlock* a, const TextBlock* b) {
-                      return a->x < b->x;
-                  });
+                  [](const TextBlock *a, const TextBlock *b) { return a->x < b->x; });
 
-        std::vector<std::string>& line = content[row_index];
+        std::vector<std::string> &line = content[row_index];
         int cur_col = layout.content_left;
 
-        for (const TextBlock* b : row_blocks) {
+        for (const TextBlock *b : row_blocks) {
             const int col = layout.content_left + to_col(b->x);
             if (col > cur_col) {
                 cur_col = col;
@@ -419,20 +424,18 @@ void render_text(const PdfDocument& doc, int page_index,
     PageLayout fitted_layout = layout;
     const int aspect_cols = aspect_cols_for_rows(page_info, window.rows);
     const int blended_cols = window.cols + ((aspect_cols - window.cols) / 2);
-    fitted_layout.content_cols = std::min(term_cols - 2,
-                                          std::max(window.cols + kMinInnerWidthPadding,
-                                                   std::max(window.cols, blended_cols)));
+    fitted_layout.content_cols =
+        std::min(term_cols - 2, std::max(window.cols + kMinInnerWidthPadding,
+                                         std::max(window.cols, blended_cols)));
     const int aspect_rows = aspect_rows_for_cols(page_info, fitted_layout.content_cols);
     const int blended_rows = window.rows + ((aspect_rows - window.rows) / 2);
-    fitted_layout.content_rows = std::min(layout.content_rows,
-                                          std::max(window.rows, blended_rows));
+    fitted_layout.content_rows = std::min(layout.content_rows, std::max(window.rows, blended_rows));
     fitted_layout.content_left = std::max(1, (term_cols - fitted_layout.content_cols) / 2);
     fitted_layout.content_top = std::max(1, (term_rows - fitted_layout.content_rows) / 2);
 
-    window.start_row = clamp_start(
-        window.start_row - ((fitted_layout.content_rows - window.rows) / 2),
-        fitted_layout.content_rows,
-        layout.content_rows);
+    window.start_row =
+        clamp_start(window.start_row - ((fitted_layout.content_rows - window.rows) / 2),
+                    fitted_layout.content_rows, layout.content_rows);
     const int content_col_offset = std::max(0, (fitted_layout.content_cols - window.cols) / 2);
 
     for (int row = 0; row < term_rows; ++row) {
@@ -457,14 +460,12 @@ void render_text(const PdfDocument& doc, int page_index,
 
             const int content_row = window.start_row + (row - fitted_layout.content_top);
             const int fitted_col = col - fitted_layout.content_left;
-            if (fitted_col < content_col_offset ||
-                fitted_col >= content_col_offset + window.cols) {
+            if (fitted_col < content_col_offset || fitted_col >= content_col_offset + window.cols) {
                 rendered.push_back(' ');
                 continue;
             }
 
-            const int content_col =
-                window.start_col + (fitted_col - content_col_offset);
+            const int content_col = window.start_col + (fitted_col - content_col_offset);
             rendered += content[static_cast<size_t>(content_row)][static_cast<size_t>(content_col)];
         }
 

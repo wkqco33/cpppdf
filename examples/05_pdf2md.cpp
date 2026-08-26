@@ -4,7 +4,7 @@
 #include <fstream>
 #include <iostream>
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
     if (argc < 2) {
         std::cerr << "Usage: ./example_05_pdf2md <file.pdf> [out.md]\n";
         return 1;

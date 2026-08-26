@@ -2,7 +2,7 @@
 #include "cpppdf/document.hpp"
 #include <iostream>
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
     if (argc < 2) {
         std::cerr << "Usage: ./example_04_render_terminal <file.pdf> [page_index]\n";
         return 1;
